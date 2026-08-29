@@ -150,6 +150,9 @@ class TipWindowGate(Gate):
             expired = True
         elif ctx.order.status == "delivered":
             delivered_date = datetime.fromisoformat(ctx.order.date)
+            if ctx.now.tzinfo is not None and delivered_date.tzinfo is None:
+                delivered_date = delivered_date.replace(tzinfo=ctx.now.tzinfo)
+
             expired = (ctx.now - delivered_date).days > TIP_WINDOW_DAYS
         else:
             expired = False

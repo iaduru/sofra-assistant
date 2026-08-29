@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 from sofra.models.audit import AuditRecord
 
@@ -100,5 +100,5 @@ Block = Union[
 class UIResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version: Literal["1"] = "1"
-    blocks: list[Block] = Field(..., min_length=1, discriminator="type")
+    blocks: list[Annotated[Block, Field(discriminator="type")]] = Field(..., min_length=1)
     audit: AuditRecord
