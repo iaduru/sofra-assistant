@@ -6,6 +6,7 @@ from typing import Any
 from rank_bm25 import BM25Okapi
 
 _ARCHIVE_PENALTY = 0.5
+_AUTHORITY_BOOST = 3.0
 
 def _tokenize(text: str) -> list[str]:
     return re.findall(r"\w+", text.lower())
@@ -19,7 +20,7 @@ class KBRetriever:
                 if line:
                     self._docs.append(json.loads(line))
 
-        corpus = [_tokenize(f"{d['title']} {d['body']}") for d in self._docs]
+        corpus = [_tokenize(f"{d['title']} {d['title']} {d['body']}") for d in self._docs]
         self._bm25 = BM25Okapi(corpus)
 
     def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
@@ -29,7 +30,14 @@ class KBRetriever:
         scored = []
         for doc, raw_score in zip(self._docs, raw_scores):
             penalty = _ARCHIVE_PENALTY if "archive" in doc.get("tags", []) else 1.0
-            scored.append((raw_score * penalty, doc))
+
+            boost = 1.0
+            doc_id = doc.get("id", "")
+            if doc_id.startswith(("pol_", "faq_", "howto_", "ann_")):
+                boost = _AUTHORITY_BOOST
+
+            final_score = raw_score * penalty * boost
+            scored.append((final_score, doc))
 
         scored.sort(key=lambda x: x[0], reverse=True)
         results = []
