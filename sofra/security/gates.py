@@ -8,11 +8,7 @@ from sofra.config import TIP_WINDOW_DAYS
 from sofra.models.audit import GateRequirement
 from sofra.models.data_models import User, Restaurant, CartItem, CheckoutQuote, Order
 from sofra.models.ui_blocks import VerificationGateBlock
-from sofra.security.messages import (
-    GATE_ERROR_MESSAGES,
-    DEFAULT_GATE_REASON,
-    DEFAULT_GATE_CTA,
-)
+from sofra.security.messages import GATE_ERROR_MESSAGES, DEFAULT_GATE_REASON, DEFAULT_GATE_CTA
 
 class GateResult(BaseModel):
     passed: bool

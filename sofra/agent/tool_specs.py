@@ -45,7 +45,6 @@ TOOL_SPECS: list[dict] = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "user_id": {"type": "string"},
                 "restaurant_id": {"type": "string"},
                 "items": {
                     "type": "array",
@@ -59,7 +58,7 @@ TOOL_SPECS: list[dict] = [
                     },
                 },
             },
-            "required": ["user_id", "restaurant_id", "items"],
+            "required": ["restaurant_id", "items"],
         },
     },
     {

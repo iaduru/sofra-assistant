@@ -14,6 +14,11 @@ SYSTEM_PROMPT = (
     "blocks: an array (at least 1 element) of: text, restaurant_card, menu_item,\n"
     "cart_summary, order_summary, confirmation_prompt, verification_gate,\n"
     "suggested_actions, error.\n\n"
+    "CRITICAL FIELD RULES FOR BLOCKS:\n"
+    "- A 'text' block MUST use the 'markdown' field for its content (DO NOT use 'text').\n"
+    '  Example: {"type": "text", "markdown": "Here is the information..."}\n'
+    "- A 'restaurant_card' MUST use the 'restaurant_id' field (DO NOT use 'id').\n"
+    '  Example: {"type": "restaurant_card", "restaurant_id": "rst_01", "name": "..."}\n\n'
     "audit.decision MUST be exactly ONE of these 6 values (no other value exists):\n"
     "- answered: you gave a plain answer grounded in data/KB, OR a sensitive\n"
     "  action (place_order/cancel_order/add_tip) executed successfully with a\n"
