@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sofra UI Renderer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+        .editor-container {
+            width: 300px;
+            height: 620px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            box-sizing: border-box;
+        }
+        .editor-container h3 {
+            font-size: 15px;
+            margin: 0;
+            color: #2f3640;
+            height: 24px;
+            display: flex;
+            align-items: center;
+        }
+        textarea {
+            width: 100%;
+            flex: 1;
+            font-family: monospace;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            resize: none;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px;
+            background-color: #ff4757;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        button:hover { background-color: #ff6b81; }
+
+        .phone-simulator {
+            width: 300px;
+            height: 620px;
+            background-color: #ffffff;
+            border-radius: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border: 6px solid #2f3640;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            box-sizing: border-box;
+        }
+        .app-header {
+            background-color: #ff4757;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .chat-container {
+            flex: 1;
+            padding: 12px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .block-text {
+            background-color: #fff;
+            padding: 10px 14px;
+            border-radius: 14px 14px 14px 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            font-size: 13px;
+            line-height: 1.4;
+            align-self: flex-start;
+            max-width: 90%;
+            word-break: break-word;
+        }
+        .block-card {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #eee;
+            width: 88%;
+            align-self: flex-start;
+            font-size: 13px;
+        }
+        .card-header { font-weight: bold; font-size: 14px; margin-bottom: 4px; display: flex; justify-content: space-between; }
+        .card-meta { font-size: 12px; color: #7f8fa6; margin-bottom: 8px; }
+        .card-price { display: flex; justify-content: space-between; font-weight: bold; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #eee; font-size: 13px;}
+
+        .block-gate {
+            background-color: #ffeaa7;
+            color: #d63031;
+            border-left: 4px solid #d63031;
+            border-radius: 8px;
+            padding: 10px 14px;
+            width: 88%;
+            align-self: flex-start;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            font-size: 13px;
+        }
+        .block-error {
+            background-color: #ff7675;
+            color: #fff;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 13px;
+        }
+
+        .btn-action { background: #0984e3; color: #fff; padding: 6px 12px; border-radius: 6px; display: inline-block; margin-top: 8px; font-size: 12px; font-weight: bold;}
+
+        strong { color: #2f3640; }
+    </style>
+</head>
+<body>
+
+    <div class="editor-container">
+        <h3>1. Paste Output JSON Here</h3>
+        <textarea id="jsonInput">
+{
+  "version": "1",
+  "blocks": [
+    {
+      "type": "text",
+      "markdown": "Your order for Energy Drink Zero from Ege Balık cannot be placed because it contains age-restricted items that require age verification."
+    },
+    {
+      "type": "verification_gate",
+      "requirement": "age_18_plus",
+      "reason": "Your cart contains age-restricted items, but your age is not verified.",
+      "cta": "Verify Age"
+    }
+  ],
+  "audit": {
+    "user_id": null,
+    "intent": null,
+    "tools_called": [],
+    "decision": "blocked",
+    "reason": null,
+    "kb_doc_ids": []
+  }
+}
+        </textarea>
+        <button onclick="renderUI()">Render UI</button>
+    </div>
+
+    <div class="phone-simulator">
+        <div class="app-header">Sofra</div>
+        <div class="chat-container" id="chat">
+        </div>
+    </div>
+
+    <script>
+        function parseMarkdown(text) {
+            if (!text) return "";
+            return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                       .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                       .replace(/\n/g, '<br>');
+        }
+
+        function renderUI() {
+            const input = document.getElementById('jsonInput').value;
+            const chat = document.getElementById('chat');
+            chat.innerHTML = '';
+
+            try {
+                const data = JSON.parse(input);
+
+                if (!data.blocks) {
+                    chat.innerHTML = '<div class="block-text block-error">Invalid JSON: Missing "blocks" array.</div>';
+                    return;
+                }
+
+                data.blocks.forEach(block => {
+                    let html = '';
+
+                    switch (block.type) {
+                        case 'text':
+                            html = `<div class="block-text">${parseMarkdown(block.markdown || block.text)}</div>`;
+                            break;
+
+                        case 'restaurant_card':
+                            html = `
+                                <div class="block-card">
+                                    <div class="card-header">
+                                        <span>🍔 ${block.name}</span>
+                                        <span>⭐ ${block.rating}</span>
+                                    </div>
+                                    <div class="card-meta">${block.cuisine} • ETA: ${block.eta_min} mins</div>
+                                    <div class="card-price">
+                                        <span>Min Order: ₺${block.min_order_try}</span>
+                                        <span>Delivery: ₺${block.delivery_fee_try}</span>
+                                    </div>
+                                </div>`;
+                            break;
+
+                        case 'cart_summary':
+                        case 'order_summary':
+                            let itemsHtml = (block.items || []).map(item =>
+                                `<div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;">
+                                    <span>${item.qty}x ${item.name || item.item_id}</span>
+                                    <span>₺${(item.price_try * item.qty).toFixed(2)}</span>
+                                </div>`
+                            ).join('');
+
+                            html = `
+                                <div class="block-card">
+                                    <div class="card-header">🛒 ${block.type === 'cart_summary' ? 'Cart Summary' : 'Order Summary'}</div>
+                                    <div style="margin-top:6px; margin-bottom:6px; border-bottom: 1px solid #eee; padding-bottom: 6px;">${itemsHtml}</div>
+                                    <div style="font-size:11px; color:#666; display:flex; justify-content:space-between;">
+                                        <span>Subtotal: ₺${block.subtotal_try}</span>
+                                        <span>Delivery: ₺${block.delivery_fee_try}</span>
+                                    </div>
+                                    <div class="card-price">
+                                        <span>Total:</span>
+                                        <span>₺${block.total_try}</span>
+                                    </div>
+                                </div>`;
+                            break;
+
+                        case 'verification_gate':
+                            html = `
+                                <div class="block-gate">
+                                    <strong>🚫 Blocked: ${block.requirement.toUpperCase()}</strong><br>
+                                    <p style="margin: 4px 0; font-size:12px;">${block.reason}</p>
+                                    ${block.cta ? `<div class="btn-action">👉 ${block.cta}</div>` : ''}
+                                </div>`;
+                            break;
+
+                        case 'confirmation_prompt':
+                            html = `
+                                <div class="block-card">
+                                    <strong>Action Required</strong><br><br>
+                                    ${block.summary}<br>
+                                    <div class="btn-action">Confirm Order</div>
+                                </div>`;
+                            break;
+
+                        case 'error':
+                            html = `
+                                <div class="block-text block-error">
+                                    <strong>Error (${block.code})</strong><br>
+                                    ${block.message}
+                                </div>`;
+                            break;
+
+                        default:
+                            html = `<div class="block-text"><em>[Unsupported block type: ${block.type}]</em></div>`;
+                    }
+
+                    chat.innerHTML += html;
+                });
+
+                chat.scrollTop = chat.scrollHeight;
+
+            } catch (e) {
+                chat.innerHTML = `<div class="block-text block-error"><strong>JSON Parse Error:</strong><br>${e.message}</div>`;
+            }
+        }
+
+        renderUI();
+    </script>
+</body>
+</html>
