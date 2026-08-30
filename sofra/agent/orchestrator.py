@@ -1,8 +1,9 @@
 from __future__ import annotations
 import json
-import anthropic
 
-from sofra.config import ANTHROPIC_API_KEY, LLM_MODEL
+from google import genai
+from google.genai import types
+from sofra.config import GEMINI_API_KEY, GEMINI_MODEL
 from sofra.data.repository import Repository
 from sofra.data.kb_retrieval import KBRetriever
 from sofra.security.token import TokenStore
@@ -29,13 +30,13 @@ class Orchestrator:
         repo: Repository,
         token_store: TokenStore,
         kb: KBRetriever,
-        api_key: str = ANTHROPIC_API_KEY,
-        model: str = LLM_MODEL,
+        api_key: str = GEMINI_API_KEY,
+        model: str = GEMINI_MODEL,
     ) -> None:
         self._repo = repo
         self._token_store = token_store
         self._kb = kb
-        self._client = anthropic.Anthropic(api_key=api_key)
+        self._client = genai.Client(api_key=api_key)
         self._model = model
 
         self._tool_registry = {
@@ -50,6 +51,21 @@ class Orchestrator:
             "cancel_order": lambda i: sensitive_tools.cancel_order(self._repo, self._token_store, **i).model_dump(mode="json"),
             "add_tip": lambda i: sensitive_tools.add_tip(self._repo, self._token_store, **i).model_dump(mode="json"),
         }
+
+        function_declarations = [
+            types.FunctionDeclaration(
+                name=spec["name"],
+                description=spec["description"],
+                parameters_json_schema=spec["input_schema"],
+            )
+            for spec in TOOL_SPECS
+        ]
+        self._tool = types.Tool(function_declarations=function_declarations)
+        self._generate_config = types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
+            tools=[self._tool],
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        )
 
     def _handle_get_menu(self, tool_input: dict) -> dict:
         result = safe_tools.get_menu(self._repo, **tool_input)
@@ -66,40 +82,62 @@ class Orchestrator:
 
     def handle_message(self, conversation: ConversationState, user_id: str, user_text: str) -> dict:
         tagged_text = f"[user_id: {user_id}]\n{user_text}"
-        conversation.add_user_message(tagged_text)
+        conversation.messages.append(
+            types.Content(role="user", parts=[types.Part.from_text(text=tagged_text)])
+        )
 
         for _ in range(_MAX_TOOL_ROUNDS):
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=2000,
-                system=SYSTEM_PROMPT,
-                tools=TOOL_SPECS,
-                messages=conversation.messages,
-            )
-            conversation.add_assistant_message(response.content)
+            try:
+                response = self._client.models.generate_content(
+                    model=self._model,
+                    contents=conversation.messages,
+                    config=self._generate_config,
+                )
+            except Exception as e:
+                return self._fallback_error(f"Gemini API temporarily unavailable: {e}")
 
-            if response.stop_reason != "tool_use":
+            candidate = response.candidates[0] if response.candidates else None
+            if candidate is None or candidate.content is None:
+                return self._fallback_error(MSG_NO_TEXT)
+
+            conversation.messages.append(candidate.content)
+
+            function_call_parts = [
+                part for part in (candidate.content.parts or []) if part.function_call is not None
+            ]
+
+            if not function_call_parts:
                 break
 
-            tool_result_blocks = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    result = self._dispatch_tool(block.name, block.input)
-                    tool_result_blocks.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps(result, ensure_ascii=False),
-                    })
-            conversation.add_user_message(tool_result_blocks)
+            response_parts = []
+            for part in function_call_parts:
+                fc = part.function_call
+                result = self._dispatch_tool(fc.name, dict(fc.args or {}))
+                response_parts.append(
+                    types.Part.from_function_response(name=fc.name, response=result)
+                )
+
+            conversation.messages.append(types.Content(role="user", parts=response_parts))
         else:
             return self._fallback_error(MSG_MAX_ROUNDS)
 
-        final_text = next((b.text for b in response.content if b.type == "text"), None)
-        if final_text is None:
+        final_text = "".join(
+            part.text for part in (candidate.content.parts or []) if part.text
+        )
+        if not final_text:
             return self._fallback_error(MSG_NO_TEXT)
 
+        clean_text = final_text.strip()
+        if clean_text.startswith("```json"):
+            clean_text = clean_text[7:]
+        elif clean_text.startswith("```"):
+            clean_text = clean_text[3:]
+        if clean_text.endswith("```"):
+            clean_text = clean_text[:-3]
+        clean_text = clean_text.strip()
+
         try:
-            parsed = json.loads(final_text)
+            parsed = json.loads(clean_text)
             validated = UIResponse.model_validate(parsed)
         except Exception as e:
             return self._fallback_error(MSG_SCHEMA_FAILED.format(e))

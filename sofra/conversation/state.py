@@ -3,13 +3,7 @@ from __future__ import annotations
 class ConversationState:
     def __init__(self, user_id: str) -> None:
         self.user_id = user_id
-        self.messages: list[dict] = []
-
-    def add_user_message(self, content) -> None:
-        self.messages.append({"role": "user", "content": content})
-
-    def add_assistant_message(self, content) -> None:
-        self.messages.append({"role": "assistant", "content": content})
+        self.messages: list = []
 
 class ConversationManager:
     def __init__(self) -> None:

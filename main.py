@@ -11,8 +11,8 @@ from sofra.agent.orchestrator import Orchestrator
 AVAILABLE_USERS = ["u_ok", "u_unverified", "u_lowbalance", "u_new"]
 
 def main() -> None:
-    if not config.ANTHROPIC_API_KEY:
-        print("ERROR: ANTHROPIC_API_KEY is not defined in the .env file.", file=sys.stderr)
+    if not config.GEMINI_API_KEY:
+        print("ERROR: GEMINI_API_KEY is not defined in the .env file.", file=sys.stderr)
         sys.exit(1)
 
     print("Starting Sofra Assistant...")

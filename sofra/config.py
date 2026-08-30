@@ -17,11 +17,11 @@ ORDERS_PATH = os.path.join(DATA_DIR, "orders.json")
 KB_PATH = os.path.join(DATA_DIR, "knowledge", "kb.jsonl")
 UI_SCHEMA_PATH = os.path.join(SCHEMA_DIR, "ui_spec.schema.json")
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "anthropic")
-LLM_MODEL = os.getenv("LLM_MODEL", "claude-sonnet-4-5")
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-_secret_str = os.getenv("SOFRA_SECRET_KEY", "secret-hmac-key")
+_secret_str = os.getenv("SECRET_KEY", "secret-hmac-key")
 SECRET_KEY: bytes = _secret_str.encode("utf-8")
 
 CONFIRM_TOKEN_TTL_SECONDS = 5 * 60
