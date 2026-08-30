@@ -1,8 +1,11 @@
+from __future__ import annotations
+import json
 from sofra.config import NOW
+from sofra.models.ui_blocks import UIResponse
 
 _TODAY = NOW.date().isoformat()
 
-SYSTEM_PROMPT = (
+_BASE_PROMPT = (
     "You are an assistant for Sofra, a fictional food delivery application.\n"
     "You talk to users in natural language, but your OUTPUT MUST ALWAYS be a\n"
     "generative UI document conforming to the JSON schema below -- never free\n"
@@ -96,3 +99,13 @@ SYSTEM_PROMPT = (
     "Now start the conversation. Your entire response must be ONLY the JSON\n"
     "described above -- no extra prose, no markdown outside the JSON."
 )
+
+_SCHEMA_INSTRUCTION = f"""
+# STRICT PYDANTIC SCHEMA ENFORCEMENT
+Your output JSON must strictly comply with the following Pydantic schema definition (UIResponse). 
+Pay close attention to required fields, types (e.g., strings vs objects in lists), and forbid any extra/invented fields:
+
+{json.dumps(UIResponse.model_json_schema(), indent=2)}
+"""
+
+SYSTEM_PROMPT = _BASE_PROMPT + "\n\n" + _SCHEMA_INSTRUCTION
